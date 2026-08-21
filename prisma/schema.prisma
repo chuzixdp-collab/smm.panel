@@ -1,0 +1,461 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ ENUMS ============
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  PARTIAL
+  CANCELLED
+  FAILED
+  REFUNDED
+}
+
+enum TransactionType {
+  DEPOSIT
+  ORDER_PAYMENT
+  REFUND
+  ADMIN_ADJUSTMENT
+  AFFILIATE_COMMISSION
+  CHILD_PANEL_CHARGE
+}
+
+enum DepositStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TicketStatus {
+  OPEN
+  ANSWERED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ServiceStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ProviderStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum PaymentMethod {
+  JAZZCASH
+  EASYPAISA
+}
+
+enum ChildPanelStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum AffiliatePayoutStatus {
+  PENDING
+  PAID
+  REJECTED
+}
+
+// ============ MODELS ============
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  name          String?
+  role          UserRole  @default(USER)
+  balance       Float     @default(0)
+  totalSpent    Float     @default(0)
+  isActive      Boolean   @default(true)
+  canCreateChildPanel Boolean @default(false)
+  referredBy    String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  orders           Order[]
+  transactions     Transaction[]
+  deposits         Deposit[]
+  tickets          SupportTicket[]
+  sessions         Session[]
+  notifications    Notification[]
+  auditLogs        AuditLog[] @relation("AdminLogs")
+  supportMessages  SupportMessage[]
+  apiKeys          ApiKey[]
+  childPanels      ChildPanel[] @relation("ChildPanelOwner")
+  childPanelUsers  ChildPanelUser[]
+  affiliateReferrals Affiliate[] @relation("AffiliateReferrer")
+  affiliateReferred  Affiliate?  @relation("AffiliateReferred")
+  affiliateEarnings AffiliateCommission[] @relation("AffiliateEarner")
+  massOrders       MassOrder[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  userAgent String?
+  ipAddress String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+
+model Provider {
+  id       String          @id @default(cuid())
+  name     String
+  apiUrl   String
+  apiKey   String
+  status   ProviderStatus  @default(ACTIVE)
+  currency String          @default("USD")
+  priority Int             @default(0)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  services Service[]
+  orders   Order[]
+
+  @@index([status])
+}
+
+model Service {
+  id                String         @id @default(cuid())
+  platform          String
+  category          String
+  name              String
+  description       String?
+  providerId        String?
+  providerServiceId String?
+  providerCost      Float?
+  price             Float
+  resellerPrice     Float?
+  minQuantity       Int
+  maxQuantity       Int
+  refillAvailable   Boolean        @default(false)
+  cancelAvailable   Boolean        @default(false)
+  status            ServiceStatus  @default(ACTIVE)
+  sortOrder         Int            @default(0)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  provider Provider?  @relation(fields: [providerId], references: [id])
+  orders   Order[]
+
+  @@index([platform])
+  @@index([status])
+  @@index([category])
+  @@index([sortOrder])
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  userId          String
+  serviceId       String
+  targetUrl       String
+  quantity        Int
+  charge          Float
+  providerId      String?
+  providerOrderId String?
+  startCount      Int         @default(0)
+  remains         Int         @default(0)
+  status          OrderStatus @default(PENDING)
+  refundAmount    Float       @default(0)
+  link            String?
+  childPanelId    String?
+  childPanelUserId String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  user          User    @relation(fields: [userId], references: [id])
+  service       Service @relation(fields: [serviceId], references: [id])
+  provider      Provider? @relation(fields: [providerId], references: [id])
+  childPanel    ChildPanel? @relation(fields: [childPanelId], references: [id])
+  childPanelUser ChildPanelUser? @relation(fields: [childPanelUserId], references: [id])
+  massOrder     MassOrder? @relation("MassOrderOrders", fields: [massOrderId], references: [id])
+
+  massOrderId String?
+
+  @@index([userId])
+  @@index([serviceId])
+  @@index([status])
+  @@index([providerOrderId])
+  @@index([childPanelId])
+}
+
+model MassOrder {
+  id         String   @id @default(cuid())
+  userId     String
+  totalOrders    Int    @default(0)
+  successCount   Int    @default(0)
+  failedCount    Int    @default(0)
+  totalCharge    Float  @default(0)
+  status     String   @default("COMPLETED")
+  createdAt  DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  orders Order[] @relation("MassOrderOrders")
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Transaction {
+  id        String           @id @default(cuid())
+  userId    String
+  type      TransactionType
+  amount    Float
+  balance   Float
+  reference String?
+  depositId String?
+  createdAt DateTime         @default(now())
+
+  user    User     @relation(fields: [userId], references: [id])
+  deposit Deposit? @relation(fields: [depositId], references: [id])
+
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model Deposit {
+  id             String        @id @default(cuid())
+  userId         String
+  amount         Float
+  paymentMethod  PaymentMethod
+  transactionId  String        @unique
+  screenshot     String?
+  status         DepositStatus @default(PENDING)
+  adminNote      String?
+  processedAt    DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id])
+  transactions Transaction[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([transactionId])
+}
+
+model ApiKey {
+  id        String   @id @default(cuid())
+  userId    String
+  key       String   @unique
+  keyPrefix String
+  isActive  Boolean  @default(true)
+  lastUsed  DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  usage ApiUsage[]
+
+  @@index([userId])
+  @@index([key])
+  @@index([keyPrefix])
+}
+
+model ApiUsage {
+  id        String   @id @default(cuid())
+  apiKeyId  String
+  endpoint  String
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@index([apiKeyId])
+  @@index([createdAt])
+}
+
+model ChildPanel {
+  id          String            @id @default(cuid())
+  userId      String
+  name        String
+  slug        String            @unique
+  title       String
+  logoUrl     String?
+  primaryColor String           @default("#6366f1")
+  domain      String?
+  markup      Float             @default(0)
+  status      ChildPanelStatus  @default(ACTIVE)
+  supportInfo String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  owner  User              @relation("ChildPanelOwner", fields: [userId], references: [id])
+  users  ChildPanelUser[]
+  orders Order[]
+
+  @@index([userId])
+  @@index([slug])
+  @@index([status])
+}
+
+model ChildPanelUser {
+  id            String   @id @default(cuid())
+  childPanelId  String
+  userId        String
+  email         String
+  passwordHash  String
+  name          String?
+  balance       Float    @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  childPanel ChildPanel @relation(fields: [childPanelId], references: [id], onDelete: Cascade)
+  parentUser User       @relation(fields: [userId], references: [id])
+  orders     Order[]
+
+  @@unique([childPanelId, email])
+  @@index([childPanelId])
+  @@index([userId])
+}
+
+model Affiliate {
+  id             String   @id @default(cuid())
+  referrerId     String
+  referredId     String   @unique
+  commission     Float    @default(0)
+  totalEarned    Float    @default(0)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  referrer User @relation("AffiliateReferrer", fields: [referrerId], references: [id])
+  referred User @relation("AffiliateReferred", fields: [referredId], references: [id])
+
+  @@index([referrerId])
+  @@index([referredId])
+}
+
+model AffiliateCommission {
+  id         String              @id @default(cuid())
+  userId     String
+  orderId    String?
+  amount     Float
+  status     AffiliatePayoutStatus @default(PENDING)
+  createdAt  DateTime @default(now())
+  paidAt     DateTime?
+
+  user  User @relation("AffiliateEarner", fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model SupportTicket {
+  id        String          @id @default(cuid())
+  userId    String
+  subject   String
+  category  String
+  priority  TicketPriority  @default(MEDIUM)
+  status    TicketStatus    @default(OPEN)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  user     User             @relation(fields: [userId], references: [id])
+  messages SupportMessage[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([priority])
+}
+
+model SupportMessage {
+  id        String   @id @default(cuid())
+  ticketId  String
+  userId    String
+  message   String
+  createdAt DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user   User          @relation(fields: [userId], references: [id])
+
+  @@index([ticketId])
+  @@index([userId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String   @default("info")
+ isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  adminId      String
+  action       String
+  target       String?
+  previousValue String?
+  newValue     String?
+  ipAddress    String?
+  createdAt    DateTime @default(now())
+
+  admin User @relation("AdminLogs", fields: [adminId], references: [id])
+
+  @@index([adminId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model SiteSettings {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@index([key])
+}
+
+model PaymentSettings {
+  id              String        @id @default(cuid())
+  method          PaymentMethod @unique
+  enabled         Boolean       @default(false)
+  accountNumber   String?
+  accountName     String?
+  merchantNumber  String?
+  minDeposit      Float         @default(1)
+  maxDeposit      Float         @default(50000)
+  instructions    String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @default(now()) @updatedAt
+}

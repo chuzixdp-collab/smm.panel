@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 50">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6"/>
+      <stop offset="100%" style="stop-color:#8B5CF6"/>
+    </linearGradient>
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#3B82F6"/>
+      <stop offset="100%" style="stop-color:#8B5CF6"/>
+    </linearGradient>
+  </defs>
+  <!-- Background rounded rect -->
+  <rect x="1" y="1" width="48" height="48" rx="12" ry="12" fill="url(#bgGrad)"/>
+  <!-- A letter -->
+  <text x="25" y="34" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="bold" fill="white" text-anchor="middle">A</text>
+  <!-- ADNAN text -->
+  <text x="58" y="25" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" fill="url(#textGrad)">ADNAN</text>
+  <!-- SMM PANEL text -->
+  <text x="58" y="42" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="600" fill="#6B7280">SMM PANEL</text>
+</svg>
