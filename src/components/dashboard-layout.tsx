@@ -40,17 +40,17 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: 'New Order', href: '/new-order', icon: ShoppingCart },
-  { label: 'Services', href: '/services', icon: Package },
-  { label: 'Orders', href: '/orders', icon: ClipboardList },
-  { label: 'Add Funds', href: '/add-funds', icon: Wallet },
-  { label: 'Mass Order', href: '/mass-order', icon: Layers },
-  { label: 'API', href: '/api', icon: Key },
-  { label: 'Tickets', href: '/tickets', icon: MessageSquare },
-  { label: 'Affiliates', href: '/affiliates', icon: Users },
-  { label: 'Child Panel', href: '/child-panel', icon: LayoutGrid },
-  { label: 'Notifications', href: '/notifications', icon: Bell },
-  { label: 'Profile', href: '/profile', icon: UserCircle },
+  { label: 'New Order', href: '/dashboard/new-order', icon: ShoppingCart },
+  { label: 'Services', href: '/dashboard/services', icon: Package },
+  { label: 'Orders', href: '/dashboard/orders', icon: ClipboardList },
+  { label: 'Add Funds', href: '/dashboard/add-funds', icon: Wallet },
+  { label: 'Mass Order', href: '/dashboard/mass-order', icon: Layers },
+  { label: 'API', href: '/dashboard/api', icon: Key },
+  { label: 'Tickets', href: '/dashboard/tickets', icon: MessageSquare },
+  { label: 'Affiliates', href: '/dashboard/affiliates', icon: Users },
+  { label: 'Child Panel', href: '/dashboard/child-panel', icon: LayoutGrid },
+  { label: 'Notifications', href: '/dashboard/notifications', icon: Bell },
+  { label: 'Profile', href: '/dashboard/profile', icon: UserCircle },
 ];
 
 interface UserInfo {
@@ -286,7 +286,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </Link>
 
           <Link
-            href="/notifications"
+            href="/dashboard/notifications"
             className="relative flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-gray-50 hover:text-slate-700 transition-colors"
           >
             <Bell className="size-5" />

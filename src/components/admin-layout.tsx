@@ -59,7 +59,7 @@ const navItems: NavItem[] = [
   { label: 'Affiliates', href: '/admin/affiliates', icon: UserCheck },
   { label: 'Tickets', href: '/admin/tickets', icon: MessageSquare },
   { label: 'Notifications', href: '/admin/notifications', icon: Bell },
-  { label: 'API Management', href: '/admin/api', icon: Key },
+  { label: 'API Management', href: '/admin/api-management', icon: Key },
   { label: 'Settings', href: '/admin/settings', icon: Settings },
   { label: 'Audit Logs', href: '/admin/audit-logs', icon: FileText },
   { label: '', href: '', icon: ArrowLeft, divider: true },
