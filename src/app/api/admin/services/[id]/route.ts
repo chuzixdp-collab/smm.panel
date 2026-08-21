@@ -108,25 +108,38 @@ export async function DELETE(
       return error('Service not found', 404);
     }
 
-    if (existing.status === 'INACTIVE') {
-      return error('Service is already inactive', 400);
+    // Check if service has existing orders
+    const orderCount = await db.order.count({ where: { serviceId: id } });
+    if (orderCount > 0) {
+      // Soft delete if orders exist
+      const service = await db.service.update({
+        where: { id },
+        data: { status: 'INACTIVE' },
+      });
+      await logAudit(
+        admin.id,
+        'service.delete',
+        id,
+        JSON.stringify({ status: existing.status }),
+        JSON.stringify({ status: 'INACTIVE' }),
+        ip
+      );
+      return success({ id: service.id, status: service.status, warning: 'Service has orders, deactivated instead of deleted' });
     }
 
-    const service = await db.service.update({
-      where: { id },
-      data: { status: 'INACTIVE' },
-    });
+    // Hard delete if no orders
+    await db.service.delete({ where: { id } });
 
     await logAudit(
       admin.id,
       'service.delete',
       id,
-      JSON.stringify({ status: existing.status }),
-      JSON.stringify({ status: 'INACTIVE' }),
+      JSON.stringify(existing),
+      undefined,
       ip
     );
 
-    return success({ id: service.id, status: service.status });
+    return success({ id, deleted: true });
   } catch (err) {
     if (err instanceof Error && (err.message === 'Unauthorized' || err.message === 'Forbidden')) {
       return unauthorized(err.message);

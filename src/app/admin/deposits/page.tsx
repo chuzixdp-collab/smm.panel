@@ -41,9 +41,9 @@ interface Deposit {
   id: string;
   user?: { name?: string; email: string };
   amount: number;
-  method: string;
+  paymentMethod: string;
   transactionId?: string;
-  screenshotUrl?: string;
+  screenshot?: string;
   status: string;
   createdAt: string;
 }
@@ -93,8 +93,9 @@ export default function AdminDepositsPage() {
       const res = await fetch(`/api/admin/deposits?${params}`);
       if (res.ok) {
         const data = await res.json();
-        setDeposits(data.deposits || data.data || []);
-        setTotalPages(data.totalPages || Math.ceil((data.total || 0) / ITEMS_PER_PAGE) || 1);
+        const payload = data.data || data;
+        setDeposits(payload.deposits || []);
+        setTotalPages(payload.totalPages || Math.ceil((payload.total || 0) / ITEMS_PER_PAGE) || 1);
       }
     } catch { toast.error('Failed to load deposits'); }
     finally { setLoading(false); }
@@ -109,7 +110,7 @@ export default function AdminDepositsPage() {
       const res = await fetch(`/api/admin/deposits/${approveTarget.id}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ note: approveNote || undefined }),
+        body: JSON.stringify({ adminNote: approveNote || undefined }),
       });
       if (res.ok) {
         toast.success('Deposit approved');
@@ -132,7 +133,7 @@ export default function AdminDepositsPage() {
       const res = await fetch(`/api/admin/deposits/${rejectTarget.id}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ note: rejectNote }),
+        body: JSON.stringify({ adminNote: rejectNote }),
       });
       if (res.ok) {
         toast.success('Deposit rejected');
@@ -202,11 +203,11 @@ export default function AdminDepositsPage() {
                         <TableCell className="font-mono text-xs">{dep.id.slice(0, 8)}</TableCell>
                         <TableCell className="text-sm truncate max-w-[130px]">{dep.user?.name || dep.user?.email || '-'}</TableCell>
                         <TableCell className="text-sm font-medium text-emerald-600">{formatCurrency(dep.amount)}</TableCell>
-                        <TableCell className="text-sm">{dep.method || '-'}</TableCell>
+                        <TableCell className="text-sm">{dep.paymentMethod || '-'}</TableCell>
                         <TableCell className="font-mono text-xs text-slate-500 truncate max-w-[100px]">{dep.transactionId || '-'}</TableCell>
                         <TableCell>
-                          {dep.screenshotUrl ? (
-                            <Button variant="ghost" size="sm" className="gap-1 text-indigo-600" onClick={() => setScreenshotUrl(dep.screenshotUrl!)}>
+                          {dep.screenshot ? (
+                            <Button variant="ghost" size="sm" className="gap-1 text-indigo-600" onClick={() => setScreenshotUrl(dep.screenshot!)}>
                               <ImageIcon className="size-3.5" /> View
                             </Button>
                           ) : (
@@ -222,8 +223,8 @@ export default function AdminDepositsPage() {
                                 <Button variant="ghost" size="icon" className="size-8"><MoreHorizontal className="size-4" /></Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                {dep.screenshotUrl && (
-                                  <DropdownMenuItem onClick={() => setScreenshotUrl(dep.screenshotUrl!)}><Eye className="size-4" /> View Screenshot</DropdownMenuItem>
+                                {dep.screenshot && (
+                                  <DropdownMenuItem onClick={() => setScreenshotUrl(dep.screenshot!)}><Eye className="size-4" /> View Screenshot</DropdownMenuItem>
                                 )}
                                 <DropdownMenuItem onClick={() => { setApproveTarget(dep); setApproveNote(''); }}><CheckCircle2 className="size-4" /> Approve</DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => { setRejectTarget(dep); setRejectNote(''); }} className="text-red-600"><XCircle className="size-4" /> Reject</DropdownMenuItem>

@@ -133,8 +133,9 @@ export default function AdminServicesPage() {
         const data = await res.json();
         const payload = data.data || data;
         setServices(payload.services || []);
-        const total = payload.total || 0;
-        setTotalPages(payload.totalPages || Math.ceil(total / ITEMS_PER_PAGE) || 1);
+        const pagination = payload.pagination || payload;
+        const total = pagination.total || 0;
+        setTotalPages(pagination.totalPages || Math.ceil(total / ITEMS_PER_PAGE) || 1);
       }
     } catch { toast.error('Failed to load services'); }
     finally { setLoading(false); }
@@ -236,7 +237,7 @@ export default function AdminServicesPage() {
     try {
       const res = await fetch(`/api/admin/services/${deleteTarget.id}`, { method: 'DELETE' });
       if (res.ok) { toast.success('Service deleted'); setDeleteTarget(null); fetchServices(); }
-      else toast.error('Failed to delete service');
+      else { const err = await res.json().catch(() => ({})); toast.error(err.error || 'Failed to delete service'); }
     } catch { toast.error('Failed to delete service'); }
     finally { setDeleteLoading(false); }
   };
