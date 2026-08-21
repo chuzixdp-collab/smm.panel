@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return success({ ...newApiKey, key: rawKey }, 201);
+    return success({ apiKey: { ...newApiKey, key: rawKey } }, 201);
   } catch (err) {
     if (err instanceof Error && (err.message === 'Unauthorized' || err.message === 'Account suspended')) {
       return unauthorized(err.message);

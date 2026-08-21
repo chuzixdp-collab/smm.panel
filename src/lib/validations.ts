@@ -50,8 +50,8 @@ export const massOrderSchema = z.object({
 // ============================================================
 
 export const createDepositSchema = z.object({
-  amount: z.number().positive('Amount must be positive').min(1, 'Minimum deposit is $1'),
-  paymentMethod: z.enum(['JAZZCASH', 'EASYPAISA']),
+  amount: z.coerce.number().positive('Amount must be positive').min(1, 'Minimum deposit is $1'),
+  paymentMethod: z.string().min(1, 'Payment method is required'),
   transactionId: z.string().min(1, 'Transaction ID is required'),
   screenshot: z.string().optional(),
 });

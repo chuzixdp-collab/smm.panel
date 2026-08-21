@@ -9,8 +9,9 @@ export async function GET() {
     if (!user) return unauthorized();
 
     const keys = await db.apiKey.findMany({
-      where: { userId: user.id },
+      where: { userId: user.id, isActive: true },
       orderBy: { createdAt: 'desc' },
+      take: 1,
       select: {
         id: true,
         keyPrefix: true,
@@ -20,13 +21,9 @@ export async function GET() {
       },
     });
 
-    // Mask the key prefix for display (show first 10 chars of prefix)
-    const maskedKeys = keys.map((k) => ({
-      ...k,
-      maskedKey: `${k.keyPrefix}...`,
-    }));
-
-    return success({ keys: maskedKeys });
+    // Return first active key or null
+    const apiKey = keys[0] || null;
+    return success({ apiKey });
   } catch (err) {
     if (err instanceof Error && (err.message === 'Unauthorized' || err.message === 'Account suspended')) {
       return unauthorized(err.message);
@@ -40,13 +37,11 @@ export async function POST() {
     const user = await requireAuth().catch(() => null);
     if (!user) return unauthorized();
 
-    // Check max 5 API keys per user
-    const keyCount = await db.apiKey.count({
+    // Deactivate any existing keys first (one key per user)
+    await db.apiKey.updateMany({
       where: { userId: user.id, isActive: true },
+      data: { isActive: false },
     });
-    if (keyCount >= 5) {
-      return error('Maximum 5 active API keys allowed');
-    }
 
     const rawKey = `sk_${uuidv4().replace(/-/g, '')}`;
     const keyHash = await hashPassword(rawKey);
@@ -62,12 +57,13 @@ export async function POST() {
         id: true,
         keyPrefix: true,
         isActive: true,
+        lastUsed: true,
         createdAt: true,
       },
     });
 
     // Return the raw key only once
-    return success({ ...apiKey, key: rawKey }, 201);
+    return success({ apiKey: { ...apiKey, key: rawKey } }, 201);
   } catch (err) {
     if (err instanceof Error && (err.message === 'Unauthorized' || err.message === 'Account suspended')) {
       return unauthorized(err.message);

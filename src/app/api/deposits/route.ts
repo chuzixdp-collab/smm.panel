@@ -21,6 +21,20 @@ export async function POST(request: NextRequest) {
       return error('Minimum deposit is $1');
     }
 
+    // Verify payment method exists and is enabled
+    const paymentSetting = await db.paymentSettings.findUnique({
+      where: { method: paymentMethod as 'JAZZCASH' | 'EASYPAISA' },
+    });
+    if (!paymentSetting || !paymentSetting.enabled) {
+      return error('This payment method is not available');
+    }
+    if (amount < paymentSetting.minDeposit) {
+      return error(`Minimum deposit for ${paymentMethod} is $${paymentSetting.minDeposit}`);
+    }
+    if (amount > paymentSetting.maxDeposit) {
+      return error(`Maximum deposit for ${paymentMethod} is $${paymentSetting.maxDeposit}`);
+    }
+
     // Duplicate transaction ID protection
     const existing = await db.deposit.findUnique({ where: { transactionId } });
     if (existing) {
@@ -31,7 +45,7 @@ export async function POST(request: NextRequest) {
       data: {
         userId: user.id,
         amount,
-        paymentMethod,
+        paymentMethod: paymentMethod as 'JAZZCASH' | 'EASYPAISA',
         transactionId,
         screenshot: screenshot || null,
         status: 'PENDING',

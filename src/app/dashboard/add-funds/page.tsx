@@ -151,8 +151,10 @@ export default function AddFundsPage() {
     switch (step) {
       case 1:
         return !!selectedMethod;
-      case 2:
-        return !!amount && parseFloat(amount) >= (selectedPaymentMethod?.minDeposit ?? 1);
+      case 2: {
+        const numAmount = parseFloat(amount);
+        return !!amount && !isNaN(numAmount) && numAmount >= Math.max(1, selectedPaymentMethod?.minDeposit ?? 1);
+      }
       case 3:
         return true;
       case 4:

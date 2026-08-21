@@ -157,8 +157,8 @@ export default function ApiDashboardPage() {
       const res = await fetch('/api/api-key');
       if (res.ok) {
         const json = await res.json();
-        const data = json.data?.apiKey || json.data?.key || json.data;
-        setApiKey(data || null);
+        const data = json.data?.apiKey || json.data?.key || null;
+        setApiKey(data);
       }
     } catch {
       // silent
@@ -181,8 +181,16 @@ export default function ApiDashboardPage() {
     try {
       const res = await fetch('/api/api-key', { method: 'POST' });
       if (res.ok) {
-        toast.success('API key generated');
-        fetchApiKey();
+        const json = await res.json().catch(() => ({}));
+        toast.success('API key generated! Copy it now — it won\'t be shown again.');
+        // The POST response includes the raw key, use it directly
+        const newKey = json.data?.apiKey || json.data;
+        if (newKey && newKey.key) {
+          setApiKey(newKey);
+          setShowKey(true);
+        } else {
+          fetchApiKey();
+        }
       } else {
         const err = await res.json().catch(() => ({}));
         toast.error(err.error || 'Failed to generate key');
@@ -197,11 +205,28 @@ export default function ApiDashboardPage() {
   const handleRegenerate = async () => {
     setActionLoading(true);
     try {
-      const res = await fetch('/api/api-key/regenerate', { method: 'POST' });
+      // Get current key ID
+      if (!apiKey?.id) {
+        toast.error('No existing key to regenerate');
+        setActionLoading(false);
+        return;
+      }
+      const res = await fetch('/api/api-key/regenerate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyId: apiKey.id }),
+      });
       if (res.ok) {
-        toast.success('API key regenerated');
+        const json = await res.json().catch(() => ({}));
+        toast.success('API key regenerated! Copy it now — it won\'t be shown again.');
+        const newKey = json.data?.apiKey || json.data;
+        if (newKey && newKey.key) {
+          setApiKey(newKey);
+          setShowKey(true);
+        } else {
+          fetchApiKey();
+        }
         setRegenerateDialog(false);
-        fetchApiKey();
       } else {
         const err = await res.json().catch(() => ({}));
         toast.error(err.error || 'Failed to regenerate key');
@@ -233,7 +258,7 @@ export default function ApiDashboardPage() {
   };
 
   const maskedKey = apiKey
-    ? `${apiKey.keyPrefix || 'sk_'}****${apiKey.key.slice(-4)}`
+    ? `${apiKey.keyPrefix || 'sk_'}****${(apiKey.key || apiKey.keyPrefix || '').slice(-4)}`
     : '';
 
   return (
