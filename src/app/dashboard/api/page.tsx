@@ -34,13 +34,13 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { formatDate, formatDateTime, timeAgo } from '@/lib/utils';
+import { formatDate, timeAgo } from '@/lib/utils';
 import { toast } from 'sonner';
 
 interface ApiKey {
   id: string;
   key: string;
-  prefix: string;
+  keyPrefix: string;
   lastUsed: string | null;
   createdAt: string;
 }
@@ -50,7 +50,7 @@ interface ApiDoc {
   endpoint: string;
   description: string;
   params: { name: string; type: string; required: boolean; desc: string }[];
-  exampleRequest: string;
+  getExampleRequest: (baseUrl: string) => string;
   exampleResponse: string;
 }
 
@@ -58,97 +58,68 @@ const API_DOCS: ApiDoc[] = [
   {
     method: 'GET',
     endpoint: '/api/v1/services',
-    description: 'Get all available services',
+    description: 'Get all available services with pricing and limits.',
     params: [],
-    exampleRequest: `curl -H "Authorization: Bearer sk_YourApiKey" \\
-  ${typeof window !== 'undefined' ? window.location.origin : ''}/api/v1/services`,
+    getExampleRequest: (base) => `curl -H "Authorization: Bearer sk_YourApiKey" \\
+  ${base}/api/v1/services`,
     exampleResponse: JSON.stringify(
-      { status: 'success', data: [{ id: 101, name: 'Instagram Followers [Real]', rate: 1.50, min: 100, max: 10000, category: 'Instagram' }] },
-      null,
-      2
+      { services: [{ service: 'clx...', name: 'Instagram Followers [Real]', type: 'Default', rate: 1.5, min: 100, max: 10000, category: 'Instagram Followers', description: '', refill: true, cancel: false }] },
+      null, 2
     ),
   },
   {
     method: 'POST',
     endpoint: '/api/v1/order',
-    description: 'Create a new order',
+    description: 'Create a new order. Supports form-encoded or JSON body.',
     params: [
-      { name: 'service', type: 'number', required: true, desc: 'Service ID' },
-      { name: 'link', type: 'string', required: true, desc: 'Target URL' },
+      { name: 'service', type: 'string', required: true, desc: 'Service ID' },
+      { name: 'link', type: 'string', required: true, desc: 'Target URL or username' },
       { name: 'quantity', type: 'number', required: true, desc: 'Order quantity' },
     ],
-    exampleRequest: `curl -X POST -H "Authorization: Bearer sk_YourApiKey" \\
-  -d "service=101" \\
+    getExampleRequest: (base) => `curl -X POST \\
+  -H "Authorization: Bearer sk_YourApiKey" \\
+  -d "service=clxabc123" \\
   -d "link=https://instagram.com/user" \\
   -d "quantity=1000" \\
-  ${typeof window !== 'undefined' ? window.location.origin : ''}/api/v1/order`,
-    exampleResponse: JSON.stringify(
-      { status: 'success', data: { orderId: 'abc123', charge: 1.50, status: 'PENDING' } },
-      null,
-      2
-    ),
+  ${base}/api/v1/order`,
+    exampleResponse: JSON.stringify({ order: 'clxabc123def' }, null, 2),
   },
   {
     method: 'GET',
-    endpoint: '/api/v1/order',
-    description: 'Check order status',
+    endpoint: '/api/v1/order/status',
+    description: 'Check the status of a single order by its ID.',
     params: [
-      { name: 'order', type: 'string', required: true, desc: 'Order ID' },
+      { name: 'order', type: 'string', required: true, desc: 'Order ID returned from create order' },
     ],
-    exampleRequest: `curl -H "Authorization: Bearer sk_YourApiKey" \\
-  "${typeof window !== 'undefined' ? window.location.origin : ''}/api/v1/order?order=abc123"`,
-    exampleResponse: JSON.stringify(
-      { status: 'success', data: { orderId: 'abc123', status: 'PROCESSING', startCount: 1500, remains: 800, charge: 1.50 } },
-      null,
-      2
-    ),
+    getExampleRequest: (base) => `curl -H "Authorization: Bearer sk_YourApiKey" \\
+  "${base}/api/v1/order/status?order=clxabc123def"`,
+    exampleResponse: JSON.stringify({ order: 'clxabc123def', charge: 1.5, start_count: 1500, status: 'PROCESSING', remains: 800, link: 'https://instagram.com/user' }, null, 2),
   },
   {
     method: 'GET',
     endpoint: '/api/v1/orders',
-    description: 'Bulk status check for multiple orders',
+    description: 'Bulk status check for multiple orders (comma-separated IDs, max 100).',
     params: [
       { name: 'orders', type: 'string', required: true, desc: 'Comma-separated order IDs' },
     ],
-    exampleRequest: `curl -H "Authorization: Bearer sk_YourApiKey" \\
-  "${typeof window !== 'undefined' ? window.location.origin : ''}/api/v1/orders?orders=abc123,def456"`,
-    exampleResponse: JSON.stringify(
-      {
-        status: 'success',
-        data: [
-          { orderId: 'abc123', status: 'PROCESSING' },
-          { orderId: 'def456', status: 'COMPLETED' },
-        ],
-      },
-      null,
-      2
-    ),
+    getExampleRequest: (base) => `curl -H "Authorization: Bearer sk_YourApiKey" \\
+  "${base}/api/v1/orders?orders=clxabc,clxdef"`,
+    exampleResponse: JSON.stringify({ orders: [{ order: 'clxabc', charge: 1.5, start_count: 0, status: 'PROCESSING', remains: 500 }, { order: 'clxdef', charge: 2.0, start_count: 100, status: 'COMPLETED', remains: 0 }] }, null, 2),
   },
   {
     method: 'GET',
     endpoint: '/api/v1/balance',
-    description: 'Get current account balance',
+    description: 'Get your current account balance.',
     params: [],
-    exampleRequest: `curl -H "Authorization: Bearer sk_YourApiKey" \\
-  ${typeof window !== 'undefined' ? window.location.origin : ''}/api/v1/balance`,
-    exampleResponse: JSON.stringify(
-      { status: 'success', data: { balance: 125.50, currency: 'USD' } },
-      null,
-      2
-    ),
+    getExampleRequest: (base) => `curl -H "Authorization: Bearer sk_YourApiKey" \\
+  ${base}/api/v1/balance`,
+    exampleResponse: JSON.stringify({ balance: 125.5, currency: 'USD' }, null, 2),
   },
 ];
 
-const methodColors: Record<string, string> = {
+const METHOD_COLORS: Record<string, string> = {
   GET: 'bg-green-100 text-green-700',
   POST: 'bg-blue-100 text-blue-700',
-};
-
-const endpointIcons: Record<string, React.ReactNode> = {
-  '/api/v1/services': <Layers className="h-4 w-4" />,
-  '/api/v1/order': <ShoppingCart className="h-4 w-4" />,
-  '/api/v1/orders': <Layers className="h-4 w-4" />,
-  '/api/v1/balance': <DollarSign className="h-4 w-4" />,
 };
 
 function ApiKeySkeleton() {
@@ -170,13 +141,15 @@ export default function ApiDashboardPage() {
   const [showKey, setShowKey] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [expandedDoc, setExpandedDoc] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
-  // Dialogs
   const [regenerateDialog, setRegenerateDialog] = useState(false);
   const [revokeDialog, setRevokeDialog] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const baseUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/v1` : '/api/v1';
+  const baseUrl = mounted ? `${window.location.origin}` : 'https://your-domain.com';
+
+  useEffect(() => { setMounted(true); }, []);
 
   const fetchApiKey = useCallback(async () => {
     setLoading(true);
@@ -194,19 +167,17 @@ export default function ApiDashboardPage() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchApiKey();
-  }, [fetchApiKey]);
+  useEffect(() => { fetchApiKey(); }, [fetchApiKey]);
 
   const copyToClipboard = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
+    navigator.clipboard.writeText(text).catch(() => {});
     setCopied(id);
     toast.success('Copied to clipboard');
     setTimeout(() => setCopied(null), 2000);
   };
 
   const handleGenerate = async () => {
- setActionLoading(true);
+    setActionLoading(true);
     try {
       const res = await fetch('/api/api-key', { method: 'POST' });
       if (res.ok) {
@@ -226,7 +197,7 @@ export default function ApiDashboardPage() {
   const handleRegenerate = async () => {
     setActionLoading(true);
     try {
-      const res = await fetch('/api/api-key', { method: 'PUT' });
+      const res = await fetch('/api/api-key/regenerate', { method: 'POST' });
       if (res.ok) {
         toast.success('API key regenerated');
         setRegenerateDialog(false);
@@ -262,7 +233,7 @@ export default function ApiDashboardPage() {
   };
 
   const maskedKey = apiKey
-    ? `${apiKey.prefix || 'sk_'}****${apiKey.key.slice(-4)}`
+    ? `${apiKey.keyPrefix || 'sk_'}****${apiKey.key.slice(-4)}`
     : '';
 
   return (
@@ -273,11 +244,7 @@ export default function ApiDashboardPage() {
       </div>
 
       {/* Base URL Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: 'easeOut' as const }}
-      >
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: 'easeOut' as const }}>
         <Card className="border-slate-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between gap-3">
@@ -290,11 +257,7 @@ export default function ApiDashboardPage() {
                   <p className="text-sm font-mono text-slate-900 truncate">{baseUrl}</p>
                 </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => copyToClipboard(baseUrl, 'baseurl')}
-              >
+              <Button variant="outline" size="sm" onClick={() => copyToClipboard(baseUrl, 'baseurl')}>
                 {copied === 'baseurl' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                 {copied === 'baseurl' ? 'Copied' : 'Copy'}
               </Button>
@@ -303,19 +266,33 @@ export default function ApiDashboardPage() {
         </Card>
       </motion.div>
 
+      {/* Auth Info */}
+      <Card className="border-amber-200 bg-amber-50/50">
+        <CardContent className="p-4">
+          <div className="flex gap-3">
+            <Key className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-amber-800">
+              <p className="font-semibold">Authentication</p>
+              <p className="mt-1 text-amber-700">
+                Include your API key in the <code className="bg-amber-100 px-1 rounded text-xs font-mono">Authorization</code> header:
+              </p>
+              <pre className="mt-2 rounded bg-white border border-amber-200 px-3 py-2 text-xs font-mono text-slate-700">
+                Authorization: Bearer {'{'}your_api_key{'}'}
+              </pre>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* API Key Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: 'easeOut' as const, delay: 0.05 }}
-      >
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: 'easeOut' as const, delay: 0.05 }}>
         <Card className="border-slate-200">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-slate-900">
               <Key className="h-5 w-5" />
-              API Key
+              Your API Key
             </CardTitle>
-            <CardDescription>Your secret key for API authentication</CardDescription>
+            <CardDescription>Generate and manage your secret API key</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -326,18 +303,13 @@ export default function ApiDashboardPage() {
                   <Key className="h-8 w-8 text-slate-400" />
                 </div>
                 <p className="mt-3 text-sm text-slate-500">No API key generated yet</p>
-                <Button
-                  className="mt-4 bg-indigo-600 hover:bg-indigo-700"
-                  onClick={handleGenerate}
-                  disabled={actionLoading}
-                >
-                  {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+                <Button className="mt-4 bg-indigo-600 hover:bg-indigo-700" onClick={handleGenerate} disabled={actionLoading}>
+                  {actionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
                   Generate API Key
                 </Button>
               </div>
             ) : (
               <div className="space-y-4">
-                {/* Key Display */}
                 <div className="flex flex-col sm:flex-row gap-3">
                   <div className="flex-1 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
                     <Key className="h-4 w-4 text-slate-400 flex-shrink-0" />
@@ -346,27 +318,18 @@ export default function ApiDashboardPage() {
                     </code>
                   </div>
                   <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setShowKey(!showKey)}
-                    >
+                    <Button variant="outline" size="icon" onClick={() => setShowKey(!showKey)}>
                       {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => copyToClipboard(apiKey.key, 'apikey')}
-                    >
+                    <Button variant="outline" size="icon" onClick={() => copyToClipboard(apiKey.key, 'apikey')}>
                       {copied === 'apikey' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
                   </div>
                 </div>
 
-                {/* Meta Info */}
                 <div className="flex flex-wrap gap-4 text-xs text-slate-500">
                   <span className="inline-flex items-center gap-1">
-                    Prefix: <code className="font-mono text-slate-700">{apiKey.prefix || 'sk_'}</code>
+                    Prefix: <code className="font-mono text-slate-700">{apiKey.keyPrefix || 'sk_'}</code>
                   </span>
                   <span className="inline-flex items-center gap-1">
                     <Clock className="h-3 w-3" />
@@ -381,22 +344,12 @@ export default function ApiDashboardPage() {
 
                 <Separator />
 
-                {/* Actions */}
                 <div className="flex flex-wrap gap-3">
-                  <Button
-                    variant="outline"
-                    onClick={() => setRegenerateDialog(true)}
-                    disabled={actionLoading}
-                  >
+                  <Button variant="outline" onClick={() => setRegenerateDialog(true)} disabled={actionLoading}>
                     <RefreshCw className="h-4 w-4" />
                     Regenerate Key
                   </Button>
-                  <Button
-                    variant="outline"
-                    className="text-red-600 border-red-200 hover:bg-red-50"
-                    onClick={() => setRevokeDialog(true)}
-                    disabled={actionLoading}
-                  >
+                  <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => setRevokeDialog(true)} disabled={actionLoading}>
                     <Trash2 className="h-4 w-4" />
                     Revoke Key
                   </Button>
@@ -418,11 +371,7 @@ export default function ApiDashboardPage() {
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRegenerateDialog(false)}>Cancel</Button>
-            <Button
-              className="bg-indigo-600 hover:bg-indigo-700"
-              onClick={handleRegenerate}
-              disabled={actionLoading}
-            >
+            <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={handleRegenerate} disabled={actionLoading}>
               {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Regenerate
             </Button>
@@ -441,11 +390,7 @@ export default function ApiDashboardPage() {
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRevokeDialog(false)}>Cancel</Button>
-            <Button
-              variant="destructive"
-              onClick={handleRevoke}
-              disabled={actionLoading}
-            >
+            <Button variant="destructive" onClick={handleRevoke} disabled={actionLoading}>
               {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Revoke Key
             </Button>
@@ -454,127 +399,108 @@ export default function ApiDashboardPage() {
       </Dialog>
 
       {/* API Documentation */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: 'easeOut' as const, delay: 0.1 }}
-      >
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: 'easeOut' as const, delay: 0.1 }}>
         <Card className="border-slate-200">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-slate-900">
               <Info className="h-5 w-5" />
               API Documentation
             </CardTitle>
-            <CardDescription>Available API endpoints for integration</CardDescription>
+            <CardDescription>Available endpoints for integration</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            {API_DOCS.map((doc) => (
-              <div
-                key={doc.endpoint}
-                className="rounded-lg border border-slate-200 overflow-hidden"
-              >
-                <button
-                  className="w-full flex items-center justify-between p-4 hover:bg-slate-50/50 transition-colors text-left"
-                  onClick={() =>
-                    setExpandedDoc(expandedDoc === doc.endpoint ? null : doc.endpoint)
-                  }
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span
-                      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold ${
-                        methodColors[doc.method] || 'bg-slate-100 text-slate-600'
-                      }`}
-                    >
-                      {doc.method}
-                    </span>
-                    <span className="text-sm font-mono text-slate-800 truncate">
-                      {doc.endpoint}
-                    </span>
-                    <span className="text-sm text-slate-500 hidden sm:inline">
-                      — {doc.description}
-                    </span>
-                  </div>
-                  {expandedDoc === doc.endpoint ? (
-                    <ChevronUp className="h-4 w-4 text-slate-400 flex-shrink-0" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4 text-slate-400 flex-shrink-0" />
-                  )}
-                </button>
+            {API_DOCS.map((doc) => {
+              const exampleReq = doc.getExampleRequest(baseUrl);
+              return (
+                <div key={doc.endpoint} className="rounded-lg border border-slate-200 overflow-hidden">
+                  <button
+                    className="w-full flex items-center justify-between p-4 hover:bg-slate-50/50 transition-colors text-left"
+                    onClick={() => setExpandedDoc(expandedDoc === doc.endpoint ? null : doc.endpoint)}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold ${METHOD_COLORS[doc.method] || 'bg-slate-100 text-slate-600'}`}>
+                        {doc.method}
+                      </span>
+                      <span className="text-sm font-mono text-slate-800 truncate">{doc.endpoint}</span>
+                      <span className="text-sm text-slate-500 hidden sm:inline">— {doc.description}</span>
+                    </div>
+                    {expandedDoc === doc.endpoint ? (
+                      <ChevronUp className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                    )}
+                  </button>
 
-                <AnimatePresence>
-                  {expandedDoc === doc.endpoint && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2, ease: 'easeOut' as const }}
-                    >
-                      <div className="border-t border-slate-100 p-4 space-y-4 bg-slate-50/30">
-                        <p className="text-sm text-slate-600">{doc.description}</p>
+                  <AnimatePresence>
+                    {expandedDoc === doc.endpoint && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2, ease: 'easeOut' as const }}
+                      >
+                        <div className="border-t border-slate-100 p-4 space-y-4 bg-slate-50/30">
+                          <p className="text-sm text-slate-600">{doc.description}</p>
 
-                        {doc.params.length > 0 && (
-                          <div>
-                            <p className="text-xs font-semibold text-slate-700 mb-2">Parameters</p>
-                            <div className="rounded-lg border border-slate-200 overflow-hidden">
-                              <table className="w-full text-sm">
-                                <thead className="bg-slate-100/50">
-                                  <tr>
-                                    <th className="text-left px-3 py-2 text-xs font-medium text-slate-500">Name</th>
-                                    <th className="text-left px-3 py-2 text-xs font-medium text-slate-500">Type</th>
-                                    <th className="text-left px-3 py-2 text-xs font-medium text-slate-500">Required</th>
-                                    <th className="text-left px-3 py-2 text-xs font-medium text-slate-500">Description</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {doc.params.map((param) => (
-                                    <tr key={param.name} className="border-t border-slate-100">
-                                      <td className="px-3 py-2 font-mono text-xs text-indigo-600">{param.name}</td>
-                                      <td className="px-3 py-2 text-xs text-slate-600">{param.type}</td>
-                                      <td className="px-3 py-2">
-                                        {param.required ? (
-                                          <Badge variant="secondary" className="bg-red-50 text-red-600 text-[10px]">Required</Badge>
-                                        ) : (
-                                          <Badge variant="secondary" className="text-[10px]">Optional</Badge>
-                                        )}
-                                      </td>
-                                      <td className="px-3 py-2 text-xs text-slate-600">{param.desc}</td>
+                          {doc.params.length > 0 && (
+                            <div>
+                              <p className="text-xs font-semibold text-slate-700 mb-2">Parameters</p>
+                              <div className="rounded-lg border border-slate-200 overflow-hidden">
+                                <table className="w-full text-sm">
+                                  <thead className="bg-slate-100/50">
+                                    <tr>
+                                      <th className="text-left px-3 py-2 text-xs font-medium text-slate-500">Name</th>
+                                      <th className="text-left px-3 py-2 text-xs font-medium text-slate-500">Type</th>
+                                      <th className="text-left px-3 py-2 text-xs font-medium text-slate-500">Required</th>
+                                      <th className="text-left px-3 py-2 text-xs font-medium text-slate-500">Description</th>
                                     </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                                  </thead>
+                                  <tbody>
+                                    {doc.params.map((param) => (
+                                      <tr key={param.name} className="border-t border-slate-100">
+                                        <td className="px-3 py-2 font-mono text-xs text-indigo-600">{param.name}</td>
+                                        <td className="px-3 py-2 text-xs text-slate-600">{param.type}</td>
+                                        <td className="px-3 py-2">
+                                          {param.required ? (
+                                            <Badge variant="secondary" className="bg-red-50 text-red-600 text-[10px]">Required</Badge>
+                                          ) : (
+                                            <Badge variant="secondary" className="text-[10px]">Optional</Badge>
+                                          )}
+                                        </td>
+                                        <td className="px-3 py-2 text-xs text-slate-600">{param.desc}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          )}
 
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs font-semibold text-slate-700">Example Request</p>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 text-xs"
-                              onClick={() => copyToClipboard(doc.exampleRequest, `req-${doc.endpoint}`)}
-                            >
-                              {copied === `req-${doc.endpoint}` ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                            </Button>
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-xs font-semibold text-slate-700">Example Request</p>
+                              <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => copyToClipboard(exampleReq, `req-${doc.endpoint}`)}>
+                                {copied === `req-${doc.endpoint}` ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                              </Button>
+                            </div>
+                            <pre className="rounded-lg bg-slate-900 text-green-400 p-3 text-xs overflow-x-auto font-mono whitespace-pre-wrap">
+                              {exampleReq}
+                            </pre>
                           </div>
-                          <pre className="rounded-lg bg-slate-900 text-green-400 p-3 text-xs overflow-x-auto font-mono">
-                            {doc.exampleRequest}
-                          </pre>
-                        </div>
 
-                        <div>
-                          <p className="text-xs font-semibold text-slate-700 mb-2">Example Response</p>
-                          <pre className="rounded-lg bg-slate-900 text-blue-300 p-3 text-xs overflow-x-auto font-mono">
-                            {doc.exampleResponse}
-                          </pre>
+                          <div>
+                            <p className="text-xs font-semibold text-slate-700 mb-2">Example Response</p>
+                            <pre className="rounded-lg bg-slate-900 text-blue-300 p-3 text-xs overflow-x-auto font-mono">
+                              {doc.exampleResponse}
+                            </pre>
+                          </div>
                         </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       </motion.div>

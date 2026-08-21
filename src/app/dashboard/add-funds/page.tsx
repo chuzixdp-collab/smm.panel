@@ -399,7 +399,7 @@ export default function AddFundsPage() {
                   </div>
                   {/* Quick amounts */}
                   <div className="flex flex-wrap gap-2">
-                    {[5, 10, 25, 50, 100].map((val) => (
+                    {[1, 5, 10, 25, 50, 100].map((val) => (
                       <Button
                         key={val}
                         variant={amount === String(val) ? 'default' : 'outline'}

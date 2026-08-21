@@ -39,7 +39,8 @@ import {
   PaginationPrevious,
   PaginationEllipsis,
 } from '@/components/ui/pagination';
-import { formatCurrency, truncate, PLATFORM_ICONS } from '@/lib/utils';
+import { formatCurrency, truncate } from '@/lib/utils';
+import { PlatformIcon } from '@/components/platform-icon';
 
 interface Service {
   id: string;
@@ -271,7 +272,7 @@ export default function ServicesPage() {
             <SelectItem value="__all__">All Platforms</SelectItem>
             {platforms.map((p) => (
               <SelectItem key={p} value={p}>
-                {PLATFORM_ICONS[p] || ''} {p}
+                {p}
               </SelectItem>
             ))}
           </SelectContent>
@@ -337,9 +338,7 @@ export default function ServicesPage() {
                           {service.id.slice(0, 8)}
                         </TableCell>
                         <TableCell>
-                          <span className="text-sm text-slate-700">
-                            {PLATFORM_ICONS[service.platform] || ''} {service.platform}
-                          </span>
+                          <PlatformIcon platform={service.platform} showLabel />
                         </TableCell>
                         <TableCell className="text-sm text-slate-600">
                           {service.category}
@@ -396,7 +395,7 @@ export default function ServicesPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-slate-900">
-                          {PLATFORM_ICONS[service.platform] || ''} {service.name}
+                          {service.name}
                         </p>
                         <p className="text-xs text-slate-500 mt-0.5">
                           {service.platform} · {service.category}
@@ -448,7 +447,7 @@ export default function ServicesPage() {
                         {service.name}
                       </p>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        {PLATFORM_ICONS[service.platform] || ''} {service.platform} · {service.category}
+                        {service.platform} · {service.category}
                       </p>
                     </div>
                     <span className="text-sm font-bold text-indigo-600 tabular-nums flex-shrink-0">
