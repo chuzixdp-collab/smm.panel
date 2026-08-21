@@ -5,6 +5,9 @@ import { success, error, forbidden, serverError } from '@/lib/api-response';
 import { updatePaymentSettingsSchema } from '@/lib/validations';
 import { logAudit } from '@/lib/audit';
 import { headers } from 'next/headers';
+import { PaymentMethod } from '@prisma/client';
+
+const VALID_METHODS: PaymentMethod[] = ['JAZZCASH', 'EASYPAISA'];
 
 export async function GET() {
   try {
@@ -34,19 +37,25 @@ export async function PUT(request: NextRequest) {
 
     if (!method) return error('Payment method is required');
 
+    // Validate method is a known enum value
+    if (!VALID_METHODS.includes(method as PaymentMethod)) {
+      return error('Invalid payment method');
+    }
+
     const parsed = updatePaymentSettingsSchema.safeParse(settingsData);
     if (!parsed.success) {
       return error(parsed.error.issues[0].message);
     }
 
     const ip = (await headers()).get('x-forwarded-for') || 'unknown';
+    const validMethod = method as PaymentMethod;
 
-    const existing = await db.paymentSettings.findUnique({ where: { method } });
+    const existing = await db.paymentSettings.findUnique({ where: { method: validMethod } });
     const previousValue = existing ? JSON.stringify(existing) : undefined;
 
     const settings = await db.paymentSettings.upsert({
-      where: { method },
-      create: { method, ...parsed.data },
+      where: { method: validMethod },
+      create: { method: validMethod, ...parsed.data },
       update: parsed.data,
     });
 

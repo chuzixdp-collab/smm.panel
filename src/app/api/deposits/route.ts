@@ -4,6 +4,9 @@ import { requireAuth } from '@/lib/auth';
 import { createDepositSchema } from '@/lib/validations';
 import { success, error, unauthorized, serverError } from '@/lib/api-response';
 
+// Server-side minimum deposit constant — enforced regardless of frontend
+const MIN_DEPOSIT = 1.00;
+
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth().catch(() => null);
@@ -17,8 +20,9 @@ export async function POST(request: NextRequest) {
 
     const { amount, paymentMethod, transactionId, screenshot } = parsed.data;
 
-    if (amount < 1) {
-      return error('Minimum deposit is $1');
+    // Hard server-side minimum enforcement
+    if (amount < MIN_DEPOSIT) {
+      return error(`Minimum deposit is $${MIN_DEPOSIT.toFixed(2)}`);
     }
 
     // Verify payment method exists and is enabled
@@ -28,8 +32,10 @@ export async function POST(request: NextRequest) {
     if (!paymentSetting || !paymentSetting.enabled) {
       return error('This payment method is not available');
     }
-    if (amount < paymentSetting.minDeposit) {
-      return error(`Minimum deposit for ${paymentMethod} is $${paymentSetting.minDeposit}`);
+    // Also enforce the payment method's own min (if higher than global MIN_DEPOSIT)
+    const effectiveMin = Math.max(MIN_DEPOSIT, paymentSetting.minDeposit);
+    if (amount < effectiveMin) {
+      return error(`Minimum deposit is $${effectiveMin.toFixed(2)}`);
     }
     if (amount > paymentSetting.maxDeposit) {
       return error(`Maximum deposit for ${paymentMethod} is $${paymentSetting.maxDeposit}`);

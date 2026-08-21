@@ -165,9 +165,9 @@ export const updatePaymentSettingsSchema = z.object({
   accountNumber: z.string().min(1, 'Account number is required'),
   accountName: z.string().min(1, 'Account name is required'),
   merchantNumber: z.string().optional(),
-  minDeposit: z.number().min(0, 'Min deposit must be >= 0'),
-  maxDeposit: z.number().min(0, 'Max deposit must be >= 0'),
-  instructions: z.string().min(1, 'Instructions are required'),
+  minDeposit: z.coerce.number().min(0, 'Min deposit must be >= 0'),
+  maxDeposit: z.coerce.number().min(0, 'Max deposit must be >= 0'),
+  instructions: z.string().optional().default(''),
   enabled: z.boolean(),
 });
 

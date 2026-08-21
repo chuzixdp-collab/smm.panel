@@ -14,6 +14,10 @@ import {
   ChevronRight,
   Loader2,
   Package,
+  Download,
+  Check,
+  CheckSquare,
+  Square,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -51,14 +55,14 @@ interface Provider {
   name: string;
 }
 
-interface Service {
+interface ServiceItem {
   id: string;
   platform: string;
   category: string;
   name: string;
   description?: string;
-  providerCost: number;
-  sellingPrice: number;
+  providerCost?: number;
+  price: number;
   resellerPrice?: number;
   minQuantity: number;
   maxQuantity: number;
@@ -82,14 +86,14 @@ function formatCurrency(amount: number) {
 
 const emptyForm = {
   platform: '', category: '', name: '', description: '', providerId: '',
-  providerServiceId: '', providerCost: '', sellingPrice: '', resellerPrice: '',
+  providerServiceId: '', providerCost: '', price: '', resellerPrice: '',
   minQuantity: '', maxQuantity: '', refillAvailable: false, cancelAvailable: false,
 };
 
 type FormData = typeof emptyForm;
 
 export default function AdminServicesPage() {
-  const [services, setServices] = useState<Service[]>([]);
+  const [services, setServices] = useState<ServiceItem[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -101,11 +105,21 @@ export default function AdminServicesPage() {
 
   // Dialogs
   const [formOpen, setFormOpen] = useState(false);
-  const [editingService, setEditingService] = useState<Service | null>(null);
+  const [editingService, setEditingService] = useState<ServiceItem | null>(null);
   const [form, setForm] = useState<FormData>({ ...emptyForm });
   const [formLoading, setFormLoading] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<Service | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ServiceItem | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Import state
+  const [importOpen, setImportOpen] = useState(false);
+  const [importProviderId, setImportProviderId] = useState('');
+  const [importLoading, setImportLoading] = useState(false);
+  const [importServices, setImportServices] = useState<any[]>([]);
+  const [importSelected, setImportSelected] = useState<Set<number>>(new Set());
+  const [importSearch, setImportSearch] = useState('');
+  const [importMarkup, setImportMarkup] = useState('10');
+  const [importing, setImporting] = useState(false);
 
   const fetchServices = useCallback(async () => {
     setLoading(true);
@@ -117,9 +131,10 @@ export default function AdminServicesPage() {
       const res = await fetch(`/api/admin/services?${params}`);
       if (res.ok) {
         const data = await res.json();
-        setServices(data.services || data.data || []);
-        setTotalPages(data.totalPages || Math.ceil((data.total || 0) / ITEMS_PER_PAGE) || 1);
-        if (data.platforms) setPlatforms(data.platforms);
+        const payload = data.data || data;
+        setServices(payload.services || []);
+        const total = payload.total || 0;
+        setTotalPages(payload.totalPages || Math.ceil(total / ITEMS_PER_PAGE) || 1);
       }
     } catch { toast.error('Failed to load services'); }
     finally { setLoading(false); }
@@ -143,7 +158,7 @@ export default function AdminServicesPage() {
     setFormOpen(true);
   };
 
-  const openEditDialog = (service: Service) => {
+  const openEditDialog = (service: ServiceItem) => {
     setEditingService(service);
     setForm({
       platform: service.platform || '',
@@ -153,7 +168,7 @@ export default function AdminServicesPage() {
       providerId: service.provider?.id || '',
       providerServiceId: service.providerServiceId || '',
       providerCost: String(service.providerCost || ''),
-      sellingPrice: String(service.sellingPrice || ''),
+      price: String(service.price || ''),
       resellerPrice: String(service.resellerPrice || ''),
       minQuantity: String(service.minQuantity || ''),
       maxQuantity: String(service.maxQuantity || ''),
@@ -164,24 +179,24 @@ export default function AdminServicesPage() {
   };
 
   const handleSubmit = async () => {
-    if (!form.name || !form.platform || !form.sellingPrice) {
-      toast.error('Please fill required fields (Platform, Name, Selling Price)');
+    if (!form.name || !form.platform || !form.price) {
+      toast.error('Please fill required fields (Platform, Name, Price)');
       return;
     }
     setFormLoading(true);
     try {
-      const body: any = {
+      const body: Record<string, unknown> = {
         platform: form.platform,
-        category: form.category,
+        category: form.category || 'General',
         name: form.name,
-        description: form.description,
+        description: form.description || null,
         providerId: form.providerId || null,
         providerServiceId: form.providerServiceId || null,
         providerCost: form.providerCost ? parseFloat(form.providerCost) : null,
-        sellingPrice: parseFloat(form.sellingPrice),
+        price: parseFloat(form.price),
         resellerPrice: form.resellerPrice ? parseFloat(form.resellerPrice) : null,
-        minQuantity: form.minQuantity ? parseInt(form.minQuantity) : null,
-        maxQuantity: form.maxQuantity ? parseInt(form.maxQuantity) : null,
+        minQuantity: form.minQuantity ? parseInt(form.minQuantity) : 1,
+        maxQuantity: form.maxQuantity ? parseInt(form.maxQuantity) : 10000,
         refillAvailable: form.refillAvailable,
         cancelAvailable: form.cancelAvailable,
       };
@@ -201,16 +216,17 @@ export default function AdminServicesPage() {
     finally { setFormLoading(false); }
   };
 
-  const handleToggle = async (service: Service) => {
-    const newStatus = service.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+  const handleToggle = async (service: ServiceItem) => {
     try {
-      const res = await fetch(`/api/admin/services/${service.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      if (res.ok) { toast.success(`Service ${newStatus === 'ACTIVE' ? 'activated' : 'deactivated'}`); fetchServices(); }
-      else toast.error('Failed to update status');
+      const res = await fetch(`/api/admin/services/${service.id}/toggle`, { method: 'POST' });
+      if (res.ok) {
+        const newStatus = service.status === 'ACTIVE' ? 'deactivated' : 'activated';
+        toast.success(`Service ${newStatus}`);
+        fetchServices();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || 'Failed to update status');
+      }
     } catch { toast.error('Failed to update status'); }
   };
 
@@ -225,6 +241,75 @@ export default function AdminServicesPage() {
     finally { setDeleteLoading(false); }
   };
 
+  const handleFetchProviderServices = async () => {
+    if (!importProviderId) { toast.error('Select a provider'); return; }
+    setImportLoading(true);
+    setImportServices([]);
+    setImportSelected(new Set());
+    try {
+      const res = await fetch(`/api/admin/providers/${importProviderId}/fetch-services`, { method: 'POST' });
+      const json = await res.json();
+      if (res.ok) {
+        const data = json.data || json;
+        setImportServices(data.services || []);
+        toast.success(`Fetched ${(data.services || []).length} services from ${data.providerName}`);
+      } else {
+        toast.error(json.error || 'Failed to fetch services');
+      }
+    } catch { toast.error('Failed to connect to provider'); }
+    finally { setImportLoading(false); }
+  };
+
+  const handleImportSelected = async () => {
+    const selected = importServices.filter((s: any) => importSelected.has(s.service));
+    if (selected.length === 0) { toast.error('Select at least one service'); return; }
+    setImporting(true);
+    try {
+      const res = await fetch('/api/admin/services/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          providerId: importProviderId,
+          services: selected,
+          markupPercent: parseFloat(importMarkup) || 0,
+        }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        const data = json.data || json;
+        toast.success(`Imported ${data.created} services (${data.skipped} skipped)`);
+        setImportOpen(false);
+        setImportServices([]);
+        setImportSelected(new Set());
+        fetchServices();
+      } else {
+        toast.error(json.error || 'Import failed');
+      }
+    } catch { toast.error('Import failed'); }
+    finally { setImporting(false); }
+  };
+
+  const toggleImportSelect = (serviceId: number) => {
+    setImportSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(serviceId)) next.delete(serviceId); else next.add(serviceId);
+      return next;
+    });
+  };
+
+  const toggleImportAll = () => {
+    const filtered = filteredImportServices;
+    if (importSelected.size === filtered.length) {
+      setImportSelected(new Set());
+    } else {
+      setImportSelected(new Set(filtered.map((s: any) => s.service)));
+    }
+  };
+
+  const filteredImportServices = importServices.filter((s: any) =>
+    !importSearch || s.name.toLowerCase().includes(importSearch.toLowerCase()) || (s.category || '').toLowerCase().includes(importSearch.toLowerCase())
+  );
+
   return (
     <div className="p-4 md:p-6 space-y-6">
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ ease: 'easeOut' as const, duration: 0.3 }} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -232,9 +317,14 @@ export default function AdminServicesPage() {
           <h1 className="text-2xl font-bold text-slate-900">Services</h1>
           <p className="text-sm text-slate-500 mt-1">Manage your SMM services</p>
         </div>
-        <Button onClick={openAddDialog} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
-          <Plus className="size-4" /> Add Service
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={openAddDialog} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+            <Plus className="size-4" /> Add Service
+          </Button>
+          <Button variant="outline" onClick={() => { setImportOpen(true); setImportServices([]); setImportSelected(new Set()); }} className="gap-2" disabled={providers.length === 0}>
+            <Download className="size-4" /> Import from Provider
+          </Button>
+        </div>
       </motion.div>
 
       {/* Filters */}
@@ -296,7 +386,7 @@ export default function AdminServicesPage() {
                         <TableCell className="text-sm">{service.platform}</TableCell>
                         <TableCell className="text-sm text-slate-600">{service.category || '-'}</TableCell>
                         <TableCell className="text-sm font-medium truncate max-w-[180px]">{service.name}</TableCell>
-                        <TableCell className="text-sm font-medium text-indigo-600">{formatCurrency(service.sellingPrice)}</TableCell>
+                        <TableCell className="text-sm font-medium text-indigo-600">{formatCurrency(service.price)}</TableCell>
                         <TableCell className="text-sm">{service.minQuantity?.toLocaleString()}</TableCell>
                         <TableCell className="text-sm">{service.maxQuantity?.toLocaleString()}</TableCell>
                         <TableCell className="text-sm text-slate-500">{service.provider?.name || '-'}</TableCell>
@@ -380,8 +470,8 @@ export default function AdminServicesPage() {
               <Input type="number" step="0.0001" placeholder="0.00" value={form.providerCost} onChange={(e) => setForm({ ...form, providerCost: e.target.value })} />
             </div>
             <div className="space-y-2">
-              <Label>Selling Price/1K *</Label>
-              <Input type="number" step="0.0001" placeholder="0.00" value={form.sellingPrice} onChange={(e) => setForm({ ...form, sellingPrice: e.target.value })} />
+              <Label>Price/1K *</Label>
+              <Input type="number" step="0.0001" placeholder="0.00" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
             </div>
             <div className="space-y-2">
               <Label>Reseller Price/1K</Label>
@@ -431,6 +521,110 @@ export default function AdminServicesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Import from Provider Dialog */}
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Import Services from Provider</DialogTitle>
+            <DialogDescription>Fetch real services from your provider API and import them into your panel.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {/* Provider select + fetch */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1">
+                <Label>Provider</Label>
+                <Select value={importProviderId} onValueChange={setImportProviderId}>
+                  <SelectTrigger className="w-full"><SelectValue placeholder="Select provider" /></SelectTrigger>
+                  <SelectContent>{providers.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="w-full sm:w-[100px]">
+                <Label>Markup %</Label>
+                <Input type="number" value={importMarkup} onChange={(e) => setImportMarkup(e.target.value)} placeholder="10" />
+              </div>
+              <div className="flex items-end">
+                <Button onClick={handleFetchProviderServices} disabled={importLoading || !importProviderId} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+                  {importLoading ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+                  Fetch
+                </Button>
+              </div>
+            </div>
+
+            {importServices.length > 0 && (
+              <>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+                    <Input placeholder="Search services..." value={importSearch} onChange={(e) => setImportSearch(e.target.value)} className="pl-9" />
+                  </div>
+                  <Button variant="outline" size="sm" onClick={toggleImportAll} className="gap-2 whitespace-nowrap">
+                    {importSelected.size === filteredImportServices.length ? 'Deselect All' : 'Select All'}
+                  </Button>
+                </div>
+
+                <p className="text-sm text-slate-500">
+                  {filteredImportServices.length} services shown · {importSelected.size} selected
+                  {importMarkup !== '0' && ` · ${importMarkup}% markup applied`}
+                </p>
+
+                <div className="rounded-lg border border-slate-200 overflow-y-auto max-h-[400px]">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 sticky top-0">
+                      <tr>
+                        <th className="w-10 px-2 py-2"></th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-slate-500">ID</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-slate-500">Name</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-slate-500">Category</th>
+                        <th className="text-right px-3 py-2 text-xs font-medium text-slate-500">Rate/1K</th>
+                        <th className="text-right px-3 py-2 text-xs font-medium text-slate-500">Min</th>
+                        <th className="text-right px-3 py-2 text-xs font-medium text-slate-500">Max</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredImportServices.slice(0, 200).map((s: any) => {
+                        const selected = importSelected.has(s.service);
+                        const costPer1k = (Number(s.rate) || 0);
+                        const markupMultiplier = 1 + ((parseFloat(importMarkup) || 0) / 100);
+                        const sellingPrice = (costPer1k * markupMultiplier).toFixed(4);
+                        return (
+                          <tr key={s.service} className={selected ? 'bg-indigo-50/50' : 'hover:bg-slate-50/50'}>
+                            <td className="px-2 py-2">
+                              <button onClick={() => toggleImportSelect(s.service)} className="text-slate-400 hover:text-indigo-600">
+                                {selected ? <CheckSquare className="size-4 text-indigo-600" /> : <Square className="size-4" />}
+                              </button>
+                            </td>
+                            <td className="px-3 py-2 font-mono text-xs text-slate-500">{s.service}</td>
+                            <td className="px-3 py-2 max-w-[250px] truncate" title={s.name}>{s.name}</td>
+                            <td className="px-3 py-2 text-xs text-slate-500">{s.category || '-'}</td>
+                            <td className="px-3 py-2 text-right">
+                              <span className="text-slate-500">${costPer1k.toFixed(4)}</span>
+                              <span className="text-indigo-600 font-medium ml-1">${sellingPrice}</span>
+                            </td>
+                            <td className="px-3 py-2 text-right text-xs text-slate-600">{Number(s.min || 0).toLocaleString()}</td>
+                            <td className="px-3 py-2 text-right text-xs text-slate-600">{Number(s.max || 0).toLocaleString()}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {filteredImportServices.length > 200 && (
+                    <p className="text-xs text-center text-slate-400 py-2">Showing 200 of {filteredImportServices.length}. Use search to narrow down, or import all.</p>
+                  )}
+                </div>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setImportOpen(false)}>Cancel</Button>
+                  <Button onClick={handleImportSelected} disabled={importing || importSelected.size === 0} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+                    {importing ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+                    Import {importSelected.size} Services
+                  </Button>
+                </DialogFooter>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
